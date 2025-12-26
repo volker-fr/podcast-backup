@@ -148,6 +148,12 @@ venv.bak/
 .spyderproject
 .spyproject
 
+# Application config
+config.toml
+
+# Podcast storage directory
+podcasts/
+
 # Rope project settings
 .ropeproject
 

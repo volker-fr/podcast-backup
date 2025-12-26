@@ -1,0 +1,61 @@
+# Podcast Backup Configuration
+# Copy this file to config.toml and update with your settings
+
+# ==============================================================================
+# OPTION 1: Single Podcast (Simple - Backward Compatible)
+# ==============================================================================
+# Use this format if you're backing up just one podcast
+# Also supports environment variables as fallback
+
+# Required: URL of the podcast RSS feed to backup
+#podcast_url = "https://feeds.example.com/podcast.rss"
+
+# Required: Directory where podcast episodes will be stored
+#storage_dir = "/path/to/podcast/archive"
+
+# Required: Base URL for accessing archived files locally
+# Examples:
+#   - "http://archive.example.com/podcasts" (local web server)
+#   - "file:///path/to/podcast/archive" (direct file access)
+#base_url = "http://archive.example.com/podcasts"
+
+# Optional: Maximum number of new episodes to download per run (default: 3)
+#max_downloads = 3
+
+# Optional: Only download episodes from the last N days (default: 0 = all)
+#days_to_download = 0
+
+# ==============================================================================
+# OPTION 2: Multiple Podcasts (Recommended)
+# ==============================================================================
+# Use this format to backup multiple podcasts in one run
+# Each podcast gets its own subdirectory under storage_dir
+
+# Global storage directory (required for multi-podcast)
+storage_dir = "/path/to/podcast/archive"
+
+# Global defaults (optional - can be overridden per-podcast)
+max_downloads = 3
+days_to_download = 0
+
+# Define each podcast with [[podcasts]] array
+[[podcasts]]
+name = "my-podcast"  # Used as folder name: storage_dir/my-podcast/
+podcast_url = "https://feeds.example.com/podcast1.rss"
+# Base URL for local access (modified RSS feed will use this)
+base_url = "http://archive.example.com/my-podcast"
+# Optional per-podcast overrides:
+# max_downloads = 5
+# days_to_download = 365
+# storage_dir = "/custom/path"  # Override global storage_dir
+
+[[podcasts]]
+name = "another-podcast"
+podcast_url = "https://feeds.example.com/podcast2.rss"
+base_url = "http://archive.example.com/another-podcast"
+
+# Add more podcasts as needed...
+# [[podcasts]]
+# name = "third-podcast"
+# podcast_url = "..."
+# base_url = "..."
