@@ -66,6 +66,16 @@ class FeedBuilder:
             # Update description text
             desc_elem.text = f"{title} podcast-backup"
 
+        # Update atom:link self-reference to point to archival feed
+        atom_ns = {"atom": "http://www.w3.org/2005/Atom"}
+        atom_link = self.channel.find("atom:link[@rel='self']", atom_ns)
+        if atom_link is not None:
+            # Construct the archival feed URL
+            # Extract podcast name from storage_dir (last part of path)
+            podcast_name = os.path.basename(self.storage_dir)
+            archival_feed_url = f"{self.base_url}/{podcast_name}/archival_backup.xml"
+            atom_link.set("href", archival_feed_url)
+
         # Track which episodes we've processed
         self.processed_urls = set()
 
@@ -231,7 +241,11 @@ class FeedBuilder:
         # We need to get the root element and iterate over preceding PIs
         root = self.tree.getroot()
         for pi in root.itersiblings(preceding=True):
-            if isinstance(pi, etree._ProcessingInstruction) and pi.target == "xml-stylesheet" and pi.text:
+            if (
+                isinstance(pi, etree._ProcessingInstruction)
+                and pi.target == "xml-stylesheet"
+                and pi.text
+            ):
                 # Parse the PI text to extract href
                 href_match = re.search(r'href=["\']([^"\']+)["\']', pi.text)
                 if href_match:

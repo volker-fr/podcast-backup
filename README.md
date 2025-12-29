@@ -200,6 +200,10 @@ Title changed: 'Old Title' → 'New Title'
 
 ## Changelog
 
+### Version 0.2.2
+
+- Fix: atom:link self-reference now points to archival feed instead of original source
+
 ### Version 0.2.1
 
 - Fix: Stylesheet href now properly updates to local path after backup
