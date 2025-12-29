@@ -200,6 +200,10 @@ Title changed: 'Old Title' → 'New Title'
 
 ## Changelog
 
+### Version 0.2.1
+
+- Fix: Stylesheet href now properly updates to local path after backup
+
 ### Version 0.2.0
 
 - Docker rootless support

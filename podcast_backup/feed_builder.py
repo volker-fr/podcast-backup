@@ -228,8 +228,10 @@ class FeedBuilder:
         """
         # Handle stylesheet processing instructions
         # Find and update any xml-stylesheet processing instructions
-        for pi in self.tree.xpath("//processing-instruction()"):
-            if pi.target == "xml-stylesheet" and pi.text:
+        # We need to get the root element and iterate over preceding PIs
+        root = self.tree.getroot()
+        for pi in root.itersiblings(preceding=True):
+            if isinstance(pi, etree._ProcessingInstruction) and pi.target == "xml-stylesheet" and pi.text:
                 # Parse the PI text to extract href
                 href_match = re.search(r'href=["\']([^"\']+)["\']', pi.text)
                 if href_match:
@@ -240,11 +242,9 @@ class FeedBuilder:
                     new_text = pi.text.replace(
                         href_match.group(0), f'href="{local_filename}"'
                     )
-                    # Create a new PI with updated href
-                    parent = pi.getparent()
-                    if parent is not None:
-                        new_pi = etree.ProcessingInstruction(pi.target, new_text)
-                        parent.replace(pi, new_pi)
+                    # Update the PI text directly (works for both document-level and nested PIs)
+                    # We can't easily "replace" document-level PIs, so modify in place
+                    pi.text = new_text
 
         # Serialize with lxml preserving structure
         # pretty_print=True for human-readable formatting
