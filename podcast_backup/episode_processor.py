@@ -3,7 +3,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Tuple
+from typing import Optional, Tuple
 
 from .downloader import download_mp3, get_remote_file_info
 from .metadata import MetadataManager
@@ -57,7 +57,7 @@ class EpisodeProcessor:
         Returns:
             Format: "YYYY-MM-DD: Title" if date known, otherwise just "Title"
         """
-        if 'published' in entry and entry.published:
+        if "published" in entry and entry.published:
             pub_date = format_pub_date_for_filename(entry.published)
             if pub_date:
                 return f"{pub_date}: {entry.title}"
@@ -87,8 +87,8 @@ class EpisodeProcessor:
 
     def _process_existing_episode(self, entry, mp3_url: str) -> Tuple[bool, str]:
         """Process an episode that exists in metadata."""
-        filename = self.metadata[mp3_url]['filename']
-        is_deleted = self.metadata[mp3_url].get('deleted', False)
+        filename = self.metadata[mp3_url]["filename"]
+        is_deleted = self.metadata[mp3_url].get("deleted", False)
 
         # Restore if episode is back in feed after being deleted
         if is_deleted:
@@ -107,21 +107,23 @@ class EpisodeProcessor:
             return self._handle_missing_file(entry, mp3_url, filename, file_path)
 
         # Check for updates to existing file
-        return self._check_for_updates(entry, mp3_url, filename, file_path, metadata_changed)
+        return self._check_for_updates(
+            entry, mp3_url, filename, file_path, metadata_changed
+        )
 
     def _restore_deleted_episode(self, mp3_url: str, filename: str, title: str):
         """Restore episode from deleted folder if it's back in feed."""
         if restore_from_deleted(self.storage_dir, self.deleted_dir, filename, title):
-            self.metadata[mp3_url]['deleted'] = False
+            self.metadata[mp3_url]["deleted"] = False
 
     def _update_title_if_changed(self, entry, mp3_url: str):
         """Update metadata if episode title changed."""
-        old_title = self.metadata[mp3_url]['title']
+        old_title = self.metadata[mp3_url]["title"]
         new_title = entry.title
 
         if old_title != new_title:
             logger.info(f"Title changed: '{old_title}' → '{new_title}'")
-            self.metadata[mp3_url]['title'] = new_title
+            self.metadata[mp3_url]["title"] = new_title
 
     def _check_metadata_changes(self, filename: str, entry, mp3_url: str) -> bool:
         """Check if episode metadata changed and archive old version if needed.
@@ -141,18 +143,18 @@ class EpisodeProcessor:
 
         # Extract feed metadata from old (exclude file-related fields)
         old_metadata = {
-            'title': episode_meta.get('title', ''),
-            'description': episode_meta.get('description', ''),
-            'published': episode_meta.get('published'),
-            'mp3_url': episode_meta.get('mp3_url', '')
+            "title": episode_meta.get("title", ""),
+            "description": episode_meta.get("description", ""),
+            "published": episode_meta.get("published"),
+            "mp3_url": episode_meta.get("mp3_url", ""),
         }
 
         # Extract feed metadata from new
         new_metadata = {
-            'title': entry.title,
-            'description': getattr(entry, 'description', ''),
-            'published': entry.published if 'published' in entry else None,
-            'mp3_url': mp3_url
+            "title": entry.title,
+            "description": getattr(entry, "description", ""),
+            "published": entry.published if "published" in entry else None,
+            "mp3_url": mp3_url,
         }
 
         # Compare the metadata blobs
@@ -168,9 +170,9 @@ class EpisodeProcessor:
 
                 # Truncate long values for logging
                 if isinstance(old_val, str) and len(old_val) > 50:
-                    old_val = old_val[:50] + '...'
+                    old_val = old_val[:50] + "..."
                 if isinstance(new_val, str) and len(new_val) > 50:
-                    new_val = new_val[:50] + '...'
+                    new_val = new_val[:50] + "..."
 
                 logger.info(f"  • {key}: '{old_val}' → '{new_val}'")
 
@@ -180,13 +182,15 @@ class EpisodeProcessor:
 
         if version_info:
             # Track in global metadata
-            changed_fields = ', '.join([key for key in old_metadata if old_metadata[key] != new_metadata[key]])
+            changed_fields = ", ".join(
+                [key for key in old_metadata if old_metadata[key] != new_metadata[key]]
+            )
             reason = f"Metadata changed ({changed_fields})"
             self.metadata_mgr.track_version(
                 mp3_url,
-                version_type='metadata',
-                archived_file=version_info['archived_file'],
-                reason=reason
+                version_type="metadata",
+                archived_file=version_info["archived_file"],
+                reason=reason,
             )
 
         return True
@@ -201,11 +205,13 @@ class EpisodeProcessor:
         # Check if episode is within date range (if filter is set)
         if not self._is_within_date_range(entry):
             self.skipped_old_count += 1
-            logger.debug(f"⊘ Skipping (outside date range): {self._format_episode_log(entry)}")
+            logger.debug(
+                f"⊘ Skipping (outside date range): {self._format_episode_log(entry)}"
+            )
             return False, filename
 
         # Check if file was previously downloaded
-        was_downloaded = self.metadata[mp3_url].get('downloaded', False)
+        was_downloaded = self.metadata[mp3_url].get("downloaded", False)
 
         episode_info = self._format_episode_log(entry)
         if was_downloaded:
@@ -214,19 +220,29 @@ class EpisodeProcessor:
             logger.info(f"↓ Downloading: {episode_info}")
 
         remote_info = get_remote_file_info(mp3_url)
-        remote_etag = remote_info.get('etag') if remote_info else None
+        remote_etag = remote_info.get("etag") if remote_info else None
 
         result = download_mp3(mp3_url, file_path)
         self.downloads_count += 1
 
         self._save_episode_files(
-            filename, entry, mp3_url, result['hash'], remote_etag, is_new=not was_downloaded
+            filename,
+            entry,
+            mp3_url,
+            result["hash"],
+            remote_etag,
+            is_new=not was_downloaded,
         )
 
         return True, filename
 
     def _check_for_updates(
-        self, entry, mp3_url: str, filename: str, file_path: str, metadata_changed: bool = False
+        self,
+        entry,
+        mp3_url: str,
+        filename: str,
+        file_path: str,
+        metadata_changed: bool = False,
     ) -> Tuple[bool, str]:
         """Check if remote file changed and update if needed."""
         # Load existing metadata
@@ -234,15 +250,15 @@ class EpisodeProcessor:
         if not episode_meta:
             return True, filename
 
-        stored_etag = episode_meta.get('etag')
-        stored_hash = episode_meta.get('file_hash_sha256')
+        stored_etag = episode_meta.get("etag")
+        stored_hash = episode_meta.get("file_hash_sha256")
 
         # Get remote file info
         remote_info = get_remote_file_info(mp3_url)
         if not remote_info:
             return True, filename
 
-        remote_etag = remote_info.get('etag')
+        remote_etag = remote_info.get("etag")
 
         # Check ETag first (fastest check)
         if self._etags_match(stored_etag, remote_etag):
@@ -269,18 +285,22 @@ class EpisodeProcessor:
 
         return True, filename
 
-    def _etags_match(self, stored_etag: Optional[str], remote_etag: Optional[str]) -> bool:
+    def _etags_match(
+        self, stored_etag: Optional[str], remote_etag: Optional[str]
+    ) -> bool:
         """Check if ETags match."""
         return stored_etag and remote_etag and stored_etag == remote_etag
 
-    def _etag_changed(self, stored_etag: Optional[str], remote_etag: Optional[str]) -> bool:
+    def _etag_changed(
+        self, stored_etag: Optional[str], remote_etag: Optional[str]
+    ) -> bool:
         """Check if ETag changed."""
         return remote_etag and remote_etag != stored_etag
 
     def _size_changed(self, file_path: str, remote_info: dict) -> bool:
         """Check if file size changed."""
         local_size = os.path.getsize(file_path)
-        remote_size = remote_info.get('content_length')
+        remote_size = remote_info.get("content_length")
         return remote_size and str(local_size) != str(remote_size)
 
     def _update_episode(
@@ -299,7 +319,9 @@ class EpisodeProcessor:
         # Check if episode is within date range (if filter is set)
         if not self._is_within_date_range(entry):
             self.skipped_old_count += 1
-            logger.debug(f"⊘ Skipping update (outside date range): {self._format_episode_log(entry)}")
+            logger.debug(
+                f"⊘ Skipping update (outside date range): {self._format_episode_log(entry)}"
+            )
             return True, filename
 
         episode_info = self._format_episode_log(entry)
@@ -308,19 +330,19 @@ class EpisodeProcessor:
         result = download_mp3(mp3_url, file_path, existing_hash=stored_hash)
         self.downloads_count += 1
 
-        if result['changed'] and result.get('version_info'):
+        if result["changed"] and result.get("version_info"):
             # Track MP3 version in global metadata
             self.metadata_mgr.track_version(
                 mp3_url,
-                version_type='content',
-                archived_file=result['version_info']['archived_file'],
-                reason='Content changed',
-                file_hash=stored_hash
+                version_type="content",
+                archived_file=result["version_info"]["archived_file"],
+                reason="Content changed",
+                file_hash=stored_hash,
             )
 
-        if result['changed']:
+        if result["changed"]:
             self._save_episode_files(
-                filename, entry, mp3_url, result['hash'], remote_etag, is_new=False
+                filename, entry, mp3_url, result["hash"], remote_etag, is_new=False
             )
 
         return True, filename
@@ -341,7 +363,9 @@ class EpisodeProcessor:
         # Check if episode is within date range (if filter is set)
         if not self._is_within_date_range(entry):
             self.skipped_old_count += 1
-            logger.debug(f"⊘ Skipping verification (outside date range): {self._format_episode_log(entry)}")
+            logger.debug(
+                f"⊘ Skipping verification (outside date range): {self._format_episode_log(entry)}"
+            )
             return True, filename
 
         episode_info = self._format_episode_log(entry)
@@ -350,26 +374,28 @@ class EpisodeProcessor:
         result = download_mp3(mp3_url, file_path, existing_hash=stored_hash)
         self.downloads_count += 1
 
-        if result['changed'] and result.get('version_info'):
+        if result["changed"] and result.get("version_info"):
             # Track MP3 version in global metadata
             self.metadata_mgr.track_version(
                 mp3_url,
-                version_type='content',
-                archived_file=result['version_info']['archived_file'],
-                reason='Content changed',
-                file_hash=stored_hash
+                version_type="content",
+                archived_file=result["version_info"]["archived_file"],
+                reason="Content changed",
+                file_hash=stored_hash,
             )
 
-        if result['changed']:
+        if result["changed"]:
             self._save_episode_files(
-                filename, entry, mp3_url, result['hash'], remote_etag, is_new=False
+                filename, entry, mp3_url, result["hash"], remote_etag, is_new=False
             )
 
         return True, filename
 
-    def _process_new_episode(self, entry, mp3_url: str, entry_idx: int = 0) -> Tuple[bool, str]:
+    def _process_new_episode(
+        self, entry, mp3_url: str, entry_idx: int = 0
+    ) -> Tuple[bool, str]:
         """Process a new episode not in metadata."""
-        pub_date = entry.published if 'published' in entry else None
+        pub_date = entry.published if "published" in entry else None
         filename = self._generate_filename(entry.title, pub_date)
         file_path = os.path.join(self.storage_dir, filename)
 
@@ -403,7 +429,7 @@ class EpisodeProcessor:
         # Get publication date, fall back to today if not available
         pub_date = format_pub_date_for_filename(pub_date_str)
         if not pub_date:
-            pub_date = datetime.now().strftime('%Y-%m-%d')
+            pub_date = datetime.now().strftime("%Y-%m-%d")
 
         # Include date in UUID generation for determinism
         combined_key = f"{title}:{pub_date}"
@@ -425,7 +451,7 @@ class EpisodeProcessor:
             return True
 
         # No publication date - exclude it when date filter is active
-        if 'published' not in entry:
+        if "published" not in entry:
             return False
 
         pub_date = parse_pub_date(entry.published)
@@ -446,25 +472,27 @@ class EpisodeProcessor:
         logger.info(f"↓ Downloading new episode: {episode_info}")
 
         remote_info = get_remote_file_info(mp3_url)
-        remote_etag = remote_info.get('etag') if remote_info else None
+        remote_etag = remote_info.get("etag") if remote_info else None
 
         result = download_mp3(mp3_url, file_path)
         self.downloads_count += 1
 
         self._save_episode_files(
-            filename, entry, mp3_url, result['hash'], remote_etag, is_new=True
+            filename, entry, mp3_url, result["hash"], remote_etag, is_new=True
         )
 
         return True
 
-    def _add_to_metadata(self, mp3_url: str, filename: str, entry, downloaded: bool = False):
+    def _add_to_metadata(
+        self, mp3_url: str, filename: str, entry, downloaded: bool = False
+    ):
         """Add episode to metadata dictionary."""
         file_path = os.path.join(self.storage_dir, filename)
         self.metadata[mp3_url] = {
-            'filename': filename,
-            'title': entry.title,
-            'published': entry.published if 'published' in entry else None,
-            'downloaded': downloaded or os.path.exists(file_path),
+            "filename": filename,
+            "title": entry.title,
+            "published": entry.published if "published" in entry else None,
+            "downloaded": downloaded or os.path.exists(file_path),
         }
 
     def _save_episode_files(
@@ -477,10 +505,16 @@ class EpisodeProcessor:
         is_new: bool = False,
     ):
         """Save episode metadata and RSS sidecar files."""
-        published = entry.published if 'published' in entry else None
+        published = entry.published if "published" in entry else None
 
         self.metadata_mgr.save_episode_metadata(
-            filename, entry.title, entry.description, mp3_url, published, file_hash, etag=etag
+            filename,
+            entry.title,
+            entry.description,
+            mp3_url,
+            published,
+            file_hash,
+            etag=etag,
         )
         save_episode_rss(self.storage_dir, filename, entry)
 
@@ -491,10 +525,23 @@ class EpisodeProcessor:
         # Update downloaded field
         file_path = os.path.join(self.storage_dir, filename)
         if mp3_url in self.metadata:
-            self.metadata[mp3_url]['downloaded'] = os.path.exists(file_path)
+            self.metadata[mp3_url]["downloaded"] = os.path.exists(file_path)
 
     def _can_download(self) -> bool:
-        """Check if we can download more episodes."""
+        """Check if we can download more episodes.
+
+        Returns False if:
+        - max_downloads < 0 (downloads disabled)
+        - max_downloads > 0 and download limit already reached
+
+        Returns True if:
+        - max_downloads == 0 (unlimited downloads)
+        - max_downloads > 0 and under limit
+        """
+        if self.max_downloads < 0:
+            return False
+        if self.max_downloads == 0:
+            return True
         return self.downloads_count < self.max_downloads
 
     def _download_limit_reached(self) -> bool:

@@ -36,13 +36,15 @@ def create_versioned_backup(file_path: str) -> dict:
     logger.info(f"  → Archived old version: {os.path.basename(backup_path)}")
 
     return {
-        'backup_path': backup_path,
-        'timestamp': timestamp,
-        'archived_file': os.path.basename(backup_path)
+        "backup_path": backup_path,
+        "timestamp": timestamp,
+        "archived_file": os.path.basename(backup_path),
     }
 
 
-def archive_old_files(mp3_path: str, json_path: str, archive_mp3: bool = True, archive_json: bool = True):
+def archive_old_files(
+    mp3_path: str, json_path: str, archive_mp3: bool = True, archive_json: bool = True
+):
     """Archive old versions of MP3 and/or JSON files.
 
     Args:

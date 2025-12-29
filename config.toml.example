@@ -19,10 +19,25 @@
 #   - "file:///path/to/podcast/archive" (direct file access)
 #base_url = "http://archive.example.com/podcasts"
 
-# Optional: Maximum number of new episodes to download per run (default: 3)
-#max_downloads = 3
+# Optional: Maximum number of new episodes to download per run (default: 0)
+# Values:
+#   -1 = Disable all downloads (only update metadata/RSS)
+#   0 = Unlimited downloads (download all available episodes)
+#   Positive number = Download up to this many episodes per run
+# Examples:
+#   max_downloads = -1  (no downloads, metadata only)
+#   max_downloads = 0   (download everything)
+#   max_downloads = 5   (download up to 5 episodes)
+#max_downloads = 0
 
 # Optional: Only download episodes from the last N days (default: 0 = all)
+# Values:
+#   0 = Download all episodes regardless of age
+#   Positive number = Only download episodes published within the last N days
+# Examples:
+#   days_to_download = 0   (download all episodes)
+#   days_to_download = 30  (only episodes from last 30 days)
+#   days_to_download = 365 (only episodes from last year)
 #days_to_download = 0
 
 # ==============================================================================
@@ -35,7 +50,9 @@
 storage_dir = "/path/to/podcast/archive"
 
 # Global defaults (optional - can be overridden per-podcast)
-max_downloads = 3
+# max_downloads: -1 = disable downloads, 0 = unlimited, positive = download limit per run
+max_downloads = 0
+# days_to_download: 0 = all episodes, positive = only episodes from last N days
 days_to_download = 0
 
 # Define each podcast with [[podcasts]] array
@@ -45,8 +62,11 @@ podcast_url = "https://feeds.example.com/podcast1.rss"
 # Base URL for local access (modified RSS feed will use this)
 base_url = "http://archive.example.com/my-podcast"
 # Optional per-podcast overrides:
-# max_downloads = 5
-# days_to_download = 365
+# max_downloads = -1       # Disable downloads (metadata/RSS only)
+# max_downloads = 0        # Unlimited downloads (download all)
+# max_downloads = 5        # Download up to 5 episodes per run
+# days_to_download = 365   # Only episodes from last year
+# days_to_download = 0     # All episodes regardless of age
 # storage_dir = "/custom/path"  # Override global storage_dir
 
 [[podcasts]]

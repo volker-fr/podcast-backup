@@ -34,6 +34,11 @@ COPY --from=builder /app/.venv /app/.venv
 COPY podcast_backup ./podcast_backup
 COPY pyproject.toml ./
 
+# Fix permissions for non-root users
+RUN find /app -type d -exec chmod 755 {} + && \
+    find /app -type f -exec chmod 644 {} + && \
+    find /app/.venv/bin -type f -exec chmod 755 {} +
+
 # Set PATH to use venv
 ENV PATH="/app/.venv/bin:$PATH"
 

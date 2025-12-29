@@ -41,7 +41,7 @@ class Config:
         self,
         podcasts: list,
         global_storage_dir: str,
-        global_max_downloads: int = 3,
+        global_max_downloads: int = 0,
         global_days_to_download: int = 0,
     ):
         self.podcasts = podcasts
@@ -57,11 +57,19 @@ class Config:
 
     def get_podcast_max_downloads(self, podcast: PodcastConfig) -> int:
         """Get max downloads for a podcast (podcast-specific or global)."""
-        return podcast.max_downloads if podcast.max_downloads is not None else self.global_max_downloads
+        return (
+            podcast.max_downloads
+            if podcast.max_downloads is not None
+            else self.global_max_downloads
+        )
 
     def get_podcast_days_to_download(self, podcast: PodcastConfig) -> int:
         """Get days to download for a podcast (podcast-specific or global)."""
-        return podcast.days_to_download if podcast.days_to_download is not None else self.global_days_to_download
+        return (
+            podcast.days_to_download
+            if podcast.days_to_download is not None
+            else self.global_days_to_download
+        )
 
 
 def load_config(config_path: Optional[str] = None) -> Config:
@@ -100,7 +108,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
         if tomllib is None:
             print(
                 "Warning: tomllib/tomli not available. Install tomli for Python < 3.11",
-                file=sys.stderr
+                file=sys.stderr,
             )
 
         if tomllib is not None:
@@ -108,17 +116,19 @@ def load_config(config_path: Optional[str] = None) -> Config:
                 config_data = tomllib.load(f)
 
     # Check if environment variables are set and warn if both are present
-    env_vars_set = any([
-        os.environ.get("PODCAST_URL"),
-        os.environ.get("PODCAST_STORAGE_DIR"),
-        os.environ.get("PODCAST_BASE_URL"),
-    ])
+    env_vars_set = any(
+        [
+            os.environ.get("PODCAST_URL"),
+            os.environ.get("PODCAST_STORAGE_DIR"),
+            os.environ.get("PODCAST_BASE_URL"),
+        ]
+    )
 
     if config_file_exists and env_vars_set:
         print(
             f"Warning: Both config file ({config_file}) and environment variables are set. "
             "Using config file values only.",
-            file=sys.stderr
+            file=sys.stderr,
         )
 
     # Check if this is multi-podcast format or single-podcast format
@@ -130,28 +140,39 @@ def load_config(config_path: Optional[str] = None) -> Config:
                 print("Error: Each podcast must have a 'name' field", file=sys.stderr)
                 sys.exit(1)
             if "podcast_url" not in podcast_data:
-                print(f"Error: Podcast '{podcast_data.get('name')}' missing 'podcast_url'", file=sys.stderr)
+                print(
+                    f"Error: Podcast '{podcast_data.get('name')}' missing 'podcast_url'",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             if "base_url" not in podcast_data:
-                print(f"Error: Podcast '{podcast_data.get('name')}' missing 'base_url'", file=sys.stderr)
+                print(
+                    f"Error: Podcast '{podcast_data.get('name')}' missing 'base_url'",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
-            podcasts.append(PodcastConfig(
-                name=podcast_data["name"],
-                podcast_url=podcast_data["podcast_url"],
-                base_url=podcast_data["base_url"],
-                storage_dir=podcast_data.get("storage_dir"),
-                max_downloads=podcast_data.get("max_downloads"),
-                days_to_download=podcast_data.get("days_to_download"),
-            ))
+            podcasts.append(
+                PodcastConfig(
+                    name=podcast_data["name"],
+                    podcast_url=podcast_data["podcast_url"],
+                    base_url=podcast_data["base_url"],
+                    storage_dir=podcast_data.get("storage_dir"),
+                    max_downloads=podcast_data.get("max_downloads"),
+                    days_to_download=podcast_data.get("days_to_download"),
+                )
+            )
 
         # Get global settings
         global_storage_dir = config_data.get("storage_dir")
         if not global_storage_dir:
-            print("Error: 'storage_dir' is required for multi-podcast configuration", file=sys.stderr)
+            print(
+                "Error: 'storage_dir' is required for multi-podcast configuration",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
-        global_max_downloads = config_data.get("max_downloads", 3)
+        global_max_downloads = config_data.get("max_downloads", 0)
         global_days_to_download = config_data.get("days_to_download", 0)
 
         return Config(
@@ -164,11 +185,17 @@ def load_config(config_path: Optional[str] = None) -> Config:
     # Single-podcast format (backward compatible)
     # Load values with environment variable fallback
     podcast_url = config_data.get("podcast_url") or os.environ.get("PODCAST_URL")
-    storage_dir = config_data.get("storage_dir") or os.environ.get("PODCAST_STORAGE_DIR")
+    storage_dir = config_data.get("storage_dir") or os.environ.get(
+        "PODCAST_STORAGE_DIR"
+    )
     base_url = config_data.get("base_url") or os.environ.get("PODCAST_BASE_URL")
     max_downloads = config_data.get("max_downloads") or os.environ.get("MAX_DOWNLOADS")
-    days_to_download = config_data.get("days_to_download") or os.environ.get("DAYS_TO_DOWNLOAD")
-    podcast_name = config_data.get("name") or os.environ.get("PODCAST_NAME") or "default"
+    days_to_download = config_data.get("days_to_download") or os.environ.get(
+        "DAYS_TO_DOWNLOAD"
+    )
+    podcast_name = (
+        config_data.get("name") or os.environ.get("PODCAST_NAME") or "default"
+    )
 
     # Validate required fields
     missing = []
@@ -182,7 +209,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
     if missing:
         print(
             f"Error: Missing required configuration: {', '.join(missing)}",
-            file=sys.stderr
+            file=sys.stderr,
         )
         print("\nConfiguration can be provided via:", file=sys.stderr)
         print("  1. config.toml file in current directory", file=sys.stderr)
@@ -191,7 +218,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
         sys.exit(1)
 
     # Convert to int with defaults
-    max_downloads = int(max_downloads) if max_downloads is not None else 3
+    max_downloads = int(max_downloads) if max_downloads is not None else 0
     days_to_download = int(days_to_download) if days_to_download is not None else 0
 
     # Create a single podcast config

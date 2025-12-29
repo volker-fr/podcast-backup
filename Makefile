@@ -6,6 +6,13 @@ ifeq ($(CONTAINER_RUNTIME),)
 $(error Neither podman nor docker found in PATH. Please install one of them.)
 endif
 
+# Set user flags based on runtime
+ifeq ($(findstring podman,$(CONTAINER_RUNTIME)),podman)
+    USER_FLAGS := --userns=keep-id
+else
+    USER_FLAGS := --user $(shell id -u):$(shell id -g)
+endif
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -44,15 +51,19 @@ docker-build: ## Build Docker image
 .PHONY: docker-run
 docker-run: docker-build ## Run podcast backup in Docker
 	$(CONTAINER_RUNTIME) run --rm \
-		-v ./config.toml:/config/config.toml:ro \
-		-v ./podcasts:/podcasts \
+		$(USER_FLAGS) \
+		-v ./config.toml:/config/config.toml:ro,Z \
+		-v ./podcasts:/podcasts:Z \
 		podcast-backup:latest
 
 .PHONY: docker-run-debug
 docker-run-debug: docker-build ## Run podcast backup in Docker with debug logging
+	mkdir -p .cache
 	$(CONTAINER_RUNTIME) run --rm \
-		-v ./config.toml:/config/config.toml:ro \
-		-v ./podcasts:/podcasts \
-		podcast-backup:latest --debug
+		$(USER_FLAGS) \
+		-v ./config.toml:/config/config.toml:ro,Z \
+		-v ./podcasts:/podcasts:Z \
+		-v ./.cache:/tmp/podcast-backup-cache:Z \
+		podcast-backup:latest --config /config/config.toml --debug
 
 .DEFAULT_GOAL := help

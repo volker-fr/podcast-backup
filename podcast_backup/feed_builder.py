@@ -1,107 +1,224 @@
 """RSS feed XML building and generation."""
 
-import xml.etree.ElementTree as ET
-import xml.dom.minidom
+import os
+import re
+import hashlib
+import json
+from io import BytesIO
+from lxml import etree
+import requests
+from urllib.parse import urljoin, urlparse
+from .logger import logger
 
 
 class FeedBuilder:
     """Builds modified RSS feed XML from podcast data."""
 
-    def __init__(self, source_feed, base_url: str):
+    def __init__(
+        self,
+        source_feed,
+        raw_xml: bytes,
+        base_url: str,
+        storage_dir: str,
+        deleted_dir: str,
+        feed_url: str,
+    ):
         """Initialize feed builder.
 
         Args:
             source_feed: Parsed feedparser feed object
+            raw_xml: Raw XML bytes from the original feed
             base_url: Base URL for serving episode files
+            storage_dir: Directory containing episode files and sidecars
+            deleted_dir: Directory containing deleted episode files
+            feed_url: Original feed URL (for resolving relative stylesheet URLs)
         """
         self.source_feed = source_feed
-        self.base_url = base_url.rstrip('/')
-        self.feed_xml = ET.Element("rss")
-        self.channel = ET.SubElement(self.feed_xml, "channel")
-        self._add_feed_metadata()
+        self.base_url = base_url.rstrip("/")
+        self.storage_dir = storage_dir
+        self.deleted_dir = deleted_dir
+        self.raw_xml = raw_xml
+        self.feed_url = feed_url
 
-    def _add_feed_metadata(self):
-        """Add feed-level metadata elements from source feed."""
-        feed = self.source_feed.feed
+        # Parse with lxml preserving as much as possible
+        # remove_blank_text=False preserves whitespace
+        # strip_cdata=False preserves CDATA sections
+        parser = etree.XMLParser(remove_blank_text=False, strip_cdata=False)
+        self.tree = etree.parse(BytesIO(raw_xml), parser)
+        self.root = self.tree.getroot()
 
-        ET.SubElement(self.channel, "title").text = feed.get('title', 'Podcast')
-        ET.SubElement(self.channel, "description").text = feed.get('description', '')
+        # Find the channel element
+        self.channel = self.root.find("channel")
+        if self.channel is None:
+            raise ValueError("No channel element found in RSS feed")
 
-        if 'link' in feed:
-            ET.SubElement(self.channel, "link").text = feed.link
+        # Update channel description
+        title_elem = self.channel.find("title")
+        desc_elem = self.channel.find("description")
+        if title_elem is not None and title_elem.text:
+            title = title_elem.text
+            # Create description element if it doesn't exist
+            if desc_elem is None:
+                desc_elem = etree.Element("description")
+                # Insert after title
+                title_index = list(self.channel).index(title_elem)
+                self.channel.insert(title_index + 1, desc_elem)
+            # Update description text
+            desc_elem.text = f"{title} podcast-backup"
 
-        if 'language' in feed:
-            ET.SubElement(self.channel, "language").text = feed.language
-
-        self._add_feed_image(feed)
-
-    def _add_feed_image(self, feed):
-        """Add podcast artwork/image if present."""
-        if 'image' not in feed:
-            return
-
-        image = ET.SubElement(self.channel, "image")
-
-        if 'href' in feed.image:
-            ET.SubElement(image, "url").text = feed.image.href
-
-        if 'title' in feed.image:
-            ET.SubElement(image, "title").text = feed.image.title
-
-        if 'link' in feed.image:
-            ET.SubElement(image, "link").text = feed.image.link
+        # Track which episodes we've processed
+        self.processed_urls = set()
 
     def add_episode(self, entry, filename: str, downloaded: bool):
-        """Add an episode item to the feed.
+        """Update an existing episode item in the feed.
 
         Args:
             entry: Feedparser entry object
             filename: Local filename for the episode
             downloaded: Whether the episode file was downloaded
         """
-        item = ET.SubElement(self.channel, "item")
+        if not entry.enclosures:
+            return
 
-        title = self._get_episode_title(entry.title, downloaded)
-        ET.SubElement(item, "title").text = title
-        ET.SubElement(item, "description").text = entry.description
+        original_url = entry.enclosures[0].href
+        self.processed_urls.add(original_url)
 
-        self._add_enclosure(item, filename, entry.enclosures[0])
+        # Find the matching item in the feed by enclosure URL
+        for item in self.channel.findall("item"):
+            enclosure = item.find("enclosure")
+            if enclosure is not None and enclosure.get("url") == original_url:
+                # Update enclosure URL to point to our backed up file
+                enclosure.set("url", f"{self.base_url}/{filename}")
 
-    def _get_episode_title(self, title: str, downloaded: bool) -> str:
-        """Get episode title with backup status prefix."""
-        if not downloaded:
-            return f"NOT BACKED UP: {title}"
-        return title
+                # Update title if not downloaded
+                if not downloaded:
+                    title_elem = item.find("title")
+                    if title_elem is not None and title_elem.text:
+                        title_elem.text = f"NOT BACKED UP: {title_elem.text}"
 
-    def _add_enclosure(self, item, filename: str, enclosure):
-        """Add enclosure element with episode file URL."""
-        enc_element = ET.SubElement(item, "enclosure")
-        enc_element.set("url", f"{self.base_url}/{filename}")
-        enc_element.set("length", enclosure.length)
-        enc_element.set("type", enclosure.type)
+                break
 
-    def add_deleted_episode(self, episode_data: dict, filename: str):
-        """Add a deleted episode to the feed.
+    def add_deleted_episode(self, filename: str):
+        """Add a deleted episode to the feed using its sidecar RSS file.
 
         Args:
-            episode_data: Episode metadata dictionary
             filename: Local filename for the episode
         """
-        item = ET.SubElement(self.channel, "item")
+        # Try to load from storage_dir first, then deleted_dir
+        rss_file = os.path.join(self.storage_dir, f"{filename}.rss.xml")
+        if not os.path.exists(rss_file):
+            rss_file = os.path.join(self.deleted_dir, f"{filename}.rss.xml")
 
-        title = f"DELETED UPSTREAM: {episode_data['title']}"
-        ET.SubElement(item, "title").text = title
-        ET.SubElement(item, "description").text = episode_data.get('description', '')
+        if not os.path.exists(rss_file):
+            # Can't add without sidecar file
+            return
 
-        # Add enclosure pointing to deleted folder
-        enclosure = ET.SubElement(item, "enclosure")
-        enclosure.set("url", f"{self.base_url}/deleted/{filename}")
-        enclosure.set("length", "0")
-        enclosure.set("type", "audio/mpeg")
+        # Parse the sidecar RSS file
+        try:
+            parser = etree.XMLParser(remove_blank_text=False, strip_cdata=False)
+            item_tree = etree.parse(rss_file, parser)
+            item = item_tree.getroot()
 
-        # Add published date if available
-        if episode_data.get('published'):
-            ET.SubElement(item, "pubDate").text = episode_data['published']
+            # Update title to indicate deletion
+            title_elem = item.find("title")
+            if title_elem is not None and title_elem.text:
+                title_elem.text = f"DELETED UPSTREAM: {title_elem.text}"
+
+            # Update enclosure URL to point to deleted folder
+            enclosure = item.find("enclosure")
+            if enclosure is not None:
+                enclosure.set("url", f"{self.base_url}/deleted/{filename}")
+
+            # Add the item to our channel
+            self.channel.append(item)
+
+        except Exception:
+            # Skip if we can't parse
+            pass
+
+    def _download_stylesheet(self, href: str) -> str:
+        """Download stylesheet file to storage directory and return local filename.
+
+        Args:
+            href: Stylesheet href attribute (relative or absolute URL)
+
+        Returns:
+            Local filename of downloaded stylesheet, or original href if download fails
+        """
+        # Resolve relative URLs against the feed URL
+        absolute_url = urljoin(self.feed_url, href)
+
+        # Extract filename from URL
+        parsed = urlparse(absolute_url)
+        filename = os.path.basename(parsed.path)
+        if not filename:
+            filename = "rss-stylesheet.xsl"
+
+        local_path = os.path.join(self.storage_dir, filename)
+        metadata_path = os.path.join(self.storage_dir, f"{filename}.json")
+
+        # Load existing metadata if available
+        existing_etag = None
+        existing_hash = None
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, "r") as f:
+                    metadata = json.load(f)
+                    existing_etag = metadata.get("etag")
+                    existing_hash = metadata.get("file_hash_sha256")
+            except Exception:
+                pass
+
+        # Download stylesheet with conditional request
+        try:
+            headers = {}
+            if existing_etag:
+                headers["If-None-Match"] = existing_etag
+
+            response = requests.get(absolute_url, headers=headers, timeout=30)
+
+            # 304 Not Modified - file hasn't changed
+            if response.status_code == 304:
+                logger.debug(f"Stylesheet unchanged (304): {filename}")
+                return filename
+
+            response.raise_for_status()
+
+            # Calculate hash of new content
+            new_hash = hashlib.sha256(response.content).hexdigest()
+
+            # Check if content actually changed
+            if os.path.exists(local_path) and existing_hash == new_hash:
+                logger.debug(f"Stylesheet unchanged (hash match): {filename}")
+                return filename
+
+            # Content changed - save new version
+            if os.path.exists(local_path):
+                logger.info(f"Updating stylesheet (content changed): {filename}")
+            else:
+                logger.info(f"Downloading stylesheet: {filename}")
+
+            with open(local_path, "wb") as f:
+                f.write(response.content)
+
+            # Save metadata
+            metadata = {
+                "url": absolute_url,
+                "file_hash_sha256": new_hash,
+                "etag": response.headers.get("ETag"),
+            }
+            with open(metadata_path, "w") as f:
+                json.dump(metadata, f, indent=2)
+
+            logger.info(f"✓ Stylesheet saved: {filename}")
+            return filename
+
+        except Exception as e:
+            logger.warning(f"Failed to download stylesheet: {e}")
+            # Return filename if local copy exists, otherwise original href
+            if os.path.exists(local_path):
+                return filename
+            return href
 
     def save(self, output_path: str):
         """Save the feed XML to file with human-readable formatting.
@@ -109,13 +226,30 @@ class FeedBuilder:
         Args:
             output_path: Path to save the XML file
         """
-        # Convert to string first
-        xml_str = ET.tostring(self.feed_xml, encoding='utf-8')
+        # Handle stylesheet processing instructions
+        # Find and update any xml-stylesheet processing instructions
+        for pi in self.tree.xpath("//processing-instruction()"):
+            if pi.target == "xml-stylesheet" and pi.text:
+                # Parse the PI text to extract href
+                href_match = re.search(r'href=["\']([^"\']+)["\']', pi.text)
+                if href_match:
+                    original_href = href_match.group(1)
+                    # Download stylesheet and get local filename
+                    local_filename = self._download_stylesheet(original_href)
+                    # Update href to point to local file using relative path
+                    new_text = pi.text.replace(
+                        href_match.group(0), f'href="{local_filename}"'
+                    )
+                    # Create a new PI with updated href
+                    parent = pi.getparent()
+                    if parent is not None:
+                        new_pi = etree.ProcessingInstruction(pi.target, new_text)
+                        parent.replace(pi, new_pi)
 
-        # Pretty print using minidom
-        dom = xml.dom.minidom.parseString(xml_str)
-        pretty_xml = dom.toprettyxml(indent="  ", encoding='utf-8')
-
-        # Write to file
-        with open(output_path, 'wb') as f:
-            f.write(pretty_xml)
+        # Serialize with lxml preserving structure
+        # pretty_print=True for human-readable formatting
+        # xml_declaration=True to include <?xml...?>
+        # encoding='utf-8' for proper character encoding
+        self.tree.write(
+            output_path, encoding="utf-8", xml_declaration=True, pretty_print=True
+        )

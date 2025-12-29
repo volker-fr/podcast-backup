@@ -26,7 +26,7 @@ def move_to_deleted(storage_dir, deleted_dir, filename, title):
         os.rename(old_file, new_file)
 
         # Also move sidecar files
-        for ext in ['.json', '.rss.xml']:
+        for ext in [".json", ".rss.xml"]:
             sidecar = os.path.join(storage_dir, f"{filename}{ext}")
             if os.path.exists(sidecar):
                 os.rename(sidecar, os.path.join(deleted_dir, f"{filename}{ext}"))
@@ -73,7 +73,7 @@ def restore_from_deleted(storage_dir, deleted_dir, filename, title):
         os.rename(deleted_file, active_file)
 
         # Also restore sidecar files
-        for ext in ['.json', '.rss.xml']:
+        for ext in [".json", ".rss.xml"]:
             sidecar = os.path.join(deleted_dir, f"{filename}{ext}")
             if os.path.exists(sidecar):
                 os.rename(sidecar, os.path.join(storage_dir, f"{filename}{ext}"))
@@ -106,9 +106,11 @@ def process_deleted_episodes(metadata, current_feed_urls, storage_dir, deleted_d
     """Mark episodes as deleted if they're no longer in the feed."""
     for mp3_url, episode_data in list(metadata.items()):
         if mp3_url not in current_feed_urls:
-            filename = episode_data['filename']
+            filename = episode_data["filename"]
 
             # Move file to deleted folder if it exists and not already marked as deleted
-            if not episode_data.get('deleted', False):
-                if move_to_deleted(storage_dir, deleted_dir, filename, episode_data['title']):
-                    episode_data['deleted'] = True
+            if not episode_data.get("deleted", False):
+                if move_to_deleted(
+                    storage_dir, deleted_dir, filename, episode_data["title"]
+                ):
+                    episode_data["deleted"] = True

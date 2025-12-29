@@ -21,7 +21,7 @@ def setup_logger(name="podcast-backup", level=logging.INFO):
     handler.setLevel(level)
 
     # Clean format: [LEVEL] message
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter("%(levelname)s: %(message)s")
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)

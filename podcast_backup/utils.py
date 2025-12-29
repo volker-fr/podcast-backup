@@ -10,9 +10,9 @@ def parse_pub_date(pub_date_str):
     """Parse publication date from RSS feed."""
     # Attempt to parse the date with two common date formats
     try:
-        pub_date = datetime.strptime(pub_date_str, '%a, %d %b %Y %H:%M:%S %z')
+        pub_date = datetime.strptime(pub_date_str, "%a, %d %b %Y %H:%M:%S %z")
     except ValueError:
-        pub_date = datetime.strptime(pub_date_str, '%a, %d %b %Y %H:%M:%S GMT')
+        pub_date = datetime.strptime(pub_date_str, "%a, %d %b %Y %H:%M:%S GMT")
     return pub_date
 
 
@@ -30,7 +30,7 @@ def format_pub_date_for_filename(pub_date_str: Optional[str]) -> Optional[str]:
 
     try:
         pub_date = parse_pub_date(pub_date_str)
-        return pub_date.strftime('%Y-%m-%d')
+        return pub_date.strftime("%Y-%m-%d")
     except (ValueError, AttributeError):
         return None
 
@@ -41,7 +41,7 @@ def calculate_file_hash(filepath):
         return None
 
     sha256 = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(8192), b''):
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
             sha256.update(chunk)
     return sha256.hexdigest()

@@ -18,6 +18,7 @@ When podcasters modify episodes (fixing audio issues, updating content, or remov
 ## Features
 
 ### Core Archival
+
 - Downloads podcast episodes from RSS feeds with deterministic UUID-based filenames
 - Supports single or multiple podcast feeds via `config.toml`
 - Stores comprehensive episode metadata (title, description, URL, publication date, file hashes)
@@ -25,6 +26,7 @@ When podcasters modify episodes (fixing audio issues, updating content, or remov
 - Configurable download limits and date filters
 
 ### Change Detection & Versioning
+
 - **Content Change Detection**: Uses ETag headers and SHA256 hashes to detect modified MP3 files
 - **Metadata Change Tracking**: Detects and archives changes to episode titles, descriptions, and publication dates
 - **Automatic Versioning**: Preserves old versions when content or metadata changes (timestamped `.pre-YYYYMMDD-HHMMSS` files)
@@ -32,6 +34,7 @@ When podcasters modify episodes (fixing audio issues, updating content, or remov
 - **Version History**: Maintains complete history of all changes with timestamps and reasons in `episodes_metadata.json`
 
 ### Smart Updates
+
 - ETag-based change detection minimizes unnecessary downloads
 - File size comparison for quick change detection
 - Hash verification for content integrity
@@ -85,6 +88,7 @@ docker compose run --rm podcast-backup --debug
 ```
 
 The Docker container will:
+
 - Read configuration from `./config.toml` (mounted as read-only)
 - Store downloaded podcasts in `./podcasts/` directory
 - Preserve all metadata and version history
@@ -113,6 +117,7 @@ uv run podcast-backup
 ### Using config.toml (Recommended)
 
 Copy `config.toml.example` to `config.toml` and edit with your settings. Supports:
+
 - Single or multiple podcast feeds
 - Per-podcast configuration overrides
 - Global defaults with podcast-specific overrides
@@ -192,6 +197,22 @@ Archived old version: 2025-12-11-uuid.pre-20251225-164211.mp3
 
 Title changed: 'Old Title' → 'New Title'
 ```
+
+## Changelog
+
+### Version 0.2.0
+
+- Docker rootless support
+- Fix: RSS feed compliance for podcast clients
+- Caching of downloads in debug mode
+- Move to lxml
+
+### Version 0.1.0
+
+- Initial release
+- Podcast episode downloading and archival
+- Change detection and versioning
+- Metadata tracking
 
 ## Development
 
